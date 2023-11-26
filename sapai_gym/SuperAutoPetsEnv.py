@@ -12,19 +12,20 @@ from sapai.data import data
 
 import traceback
 
+
 class SuperAutoPetsEnv(gym.Env):
     metadata = {'render.modes': ['human']}
-    MAX_ACTIONS = 213
+    MAX_ACTIONS = 216
     ACTION_BASE_NUM = {
         "end_turn": 0,
         "buy_pet": 1,
-        "buy_food": 7,
-        "buy_combine": 17,
-        "combine": 47,
-        "sell": 57,
-        "roll": 62,
-        "buy_food_team": 63,
-        "reorder": 65,
+        "buy_food": 11,
+        "buy_combine": 21,
+        "combine": 51,
+        "sell": 61,
+        "roll": 66,
+        "buy_food_team": 67,
+        "reorder": 68,
     }
     # Max turn limit to prevent infinite loops
     MAX_TURN = 25
@@ -35,7 +36,7 @@ class SuperAutoPetsEnv(gym.Env):
     # Max number of pets that can be in a shop
     MAX_SHOP_PETS = 6
     # Max number of foods that can be in a shop
-    MAX_SHOP_FOODS = 2
+    MAX_SHOP_FOODS = 3
     ALL_PETS = ["pet-ant", "pet-beaver", "pet-beetle", "pet-bluebird", "pet-cricket", "pet-duck", "pet-fish", "pet-horse", "pet-ladybug", "pet-mosquito", "pet-otter", "pet-pig", "pet-sloth", "pet-bat", "pet-crab", "pet-dodo", "pet-dog", "pet-dromedary", "pet-elephant", "pet-flamingo", "pet-hedgehog", "pet-peacock", "pet-rat", "pet-shrimp", "pet-spider", "pet-swan", "pet-tabby-cat", "pet-badger", "pet-blowfish", "pet-caterpillar", "pet-camel", "pet-hatching-chick", "pet-giraffe", "pet-kangaroo", "pet-owl", "pet-ox", "pet-puppy", "pet-rabbit", "pet-sheep", "pet-snail", "pet-tropical-fish", "pet-turtle", "pet-whale", "pet-bison", "pet-buffalo", "pet-deer", "pet-dolphin", "pet-hippo", "pet-llama", "pet-lobster", "pet-monkey", "pet-mouse", "pet-penguin", "pet-poodle", "pet-rooster", "pet-skunk", "pet-squirrel", "pet-worm", "pet-chicken", "pet-cow", "pet-crocodile", "pet-eagle", "pet-goat", "pet-microbe", "pet-parrot", "pet-rhino", "pet-scorpion", "pet-seal", "pet-shark", "pet-turkey", "pet-cat", "pet-boar", "pet-dragon", "pet-fly", "pet-gorilla", "pet-leopard", "pet-mammoth", "pet-octopus", "pet-sauropod", "pet-snake", "pet-tiger", "pet-tyrannosaurus", "pet-zombie-cricket", "pet-bus", "pet-zombie-fly", "pet-dirty-rat", "pet-chick", "pet-ram", "pet-butterfly", "pet-bee"]
     ALL_FOODS = ["food-apple", "food-better-apple", "food-best-apple", "food-honey", "food-cupcake", "food-meat-bone", "food-sleeping-pill", "food-garlic", "food-salad-bowl", "food-canned-food", "food-pear", "food-chili", "food-chocolate", "food-sushi", "food-melon", "food-mushroom", "food-pizza", "food-steak", "food-milk"]
     ALL_STATUSES = ["status-weak", "status-coconut-shield", "status-honey-bee", "status-bone-attack", "status-garlic-armor", "status-splash-attack", "status-melon-armor", "status-extra-life", "status-steak-attack", "status-poison-attack"]
@@ -61,7 +62,8 @@ class SuperAutoPetsEnv(gym.Env):
             assert opponent_generator is not None
 
         self.action_space = spaces.Discrete(self.MAX_ACTIONS)
-        len_obs_space = (len(self.ALL_PETS) + 2 + len(self.ALL_STATUSES)) * 11 + (len(self.ALL_FOODS) + 1) * 2 + 5
+        #                          pets + statuses *          9+5 pet slots (shop + team)         shop foods * 9 slots          wins,lives,gold,turn,shop_attack (5)
+        len_obs_space = ((len(self.ALL_PETS) + 1 + len(self.ALL_STATUSES) + 1) * (9 + 5)) + ((len(self.ALL_FOODS) + 1) * 9) + 5
         self.observation_space = spaces.Box(low=0, high=1, shape=(len_obs_space,), dtype=np.uint8)
         self.reward_range = (0, 1)
 
@@ -80,20 +82,22 @@ class SuperAutoPetsEnv(gym.Env):
 
     def step(self, action):
         # try n times, if fails 5 times, something is obviously wrong, and training should be stopped.
-        for _ in range(2):
-            try:
-                self.resolve_action(action)
+        # for _ in range(2):
+        try:
+            self.resolve_action(action)
 
-                obs = self._encode_state()
-                reward = self.get_reward()
-                done = self.is_done()
-                info = dict()
+            obs = self._encode_state()
+            reward = self.get_reward()
+            done = self.is_done()
+            info = dict()
 
-                return obs, reward, done, info
-            except Exception as e:
-                print("An exception occured in the step. Trying again. Error was:", e)
-                traceback.print_exc()
-                print(self.player)
+            return obs, reward, done, info
+        except Exception as e:
+            print("An exception occured in the step:", e)
+            traceback.print_exc()
+            print(self.player)
+
+        return [], -1, True, {}
 
 
     def resolve_action(self, action):
@@ -378,9 +382,9 @@ class SuperAutoPetsEnv(gym.Env):
         shop_foods = self._get_shop_foods()
 
         # Pad to the maximum number of pets and foods that can be in a shop
-        while len(shop_pets) < 6:
+        while len(shop_pets) < 9:
             shop_pets.append(Pet("pet-none"))
-        while len(shop_foods) < 2:
+        while len(shop_foods) < 9:
             shop_foods.append((Food("food-none"), 0))
 
         encoded_shop_pets = self._encode_pets(shop_pets)
